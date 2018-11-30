@@ -1,0 +1,3 @@
+PAD = 0
+START = 7
+STOP = 8
