@@ -25,13 +25,13 @@ parser.add_argument('--save-epoch', action='store_true',
 parser.add_argument('--data', type=str, default='dataset',
                     help='location of the data corpus')
 
-parser.add_argument('--word-ebd-dim', type=int, default=500,
+parser.add_argument('--word-ebd-dim', type=int, default=300,
                     help='number of word embedding dimension')
 parser.add_argument('--dropout', type=float, default=0.5,
                     help='the probability for dropout')
-parser.add_argument('--lstm-hsz', type=int, default=500,
+parser.add_argument('--lstm-hsz', type=int, default=300,
                     help='BiLSTM hidden size')
-parser.add_argument('--lstm-layers', type=int, default=3,
+parser.add_argument('--lstm-layers', type=int, default=2,
                     help='biLSTM layer numbers')
 parser.add_argument('--l2', type=float, default=0.005,
                     help='l2 regularization')
@@ -74,9 +74,9 @@ optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), 
 def train():
     model.train()
     total_loss = 0
-    for word, label, _ in train_data:
+    for word, label, seq_lengths, _  in train_data:
         optimizer.zero_grad()
-        loss, _ = model(word, label)
+        loss, _ = model(word, label, seq_lengths)
         loss.backward()
         optimizer.step()
 
@@ -96,12 +96,13 @@ def evaluate(epoch):
         
         label_list = []
 
-        for word, label, seq_len_list in test_data:
-            loss, _ = model(word, label)
-            pred = model.predict(word)
+        for word, label, seq_lengths, unsort_idx in test_data:
+            loss, _ = model(word, label, seq_lengths)
+            pred = model.predict(word, seq_lengths)
+            pred = pred[unsort_idx]
+            seq_lengths = seq_lengths[unsort_idx]
 
-
-            for i, seq_len in enumerate(seq_len_list):
+            for i, seq_len in enumerate(seq_lengths.cpu().numpy()):
                 pred_ = list(pred[i][:seq_len].cpu().numpy())
                 label_list.append(pred_)
                 
@@ -112,9 +113,10 @@ def evaluate(epoch):
             tag_ = [label2tag[label__] for label__ in label_]
             sent_res = []
             if  len(label_) != len(sent):
-                print(sent)
+                # print(sent)
+                print(len(sent))
                 print(len(label_))
-                print(tag)
+                # print(tag)
             for i in range(len(sent)):
                 sent_res.append([sent[i], tag[i], tag_[i]])
             model_predict.append(sent_res)

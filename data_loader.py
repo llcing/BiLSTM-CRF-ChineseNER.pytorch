@@ -45,8 +45,9 @@ class DataLoader(object):
 
             
             inst_data_tensor = inst_data_tensor.cuda()
+            seq_len = torch.LongTensor(seq_len_list).cuda()
 
-            return inst_data_tensor, seq_len_list
+            return inst_data_tensor, seq_len
 
 
         if self._step == self._stop_step:
@@ -57,7 +58,11 @@ class DataLoader(object):
         _bsz = self._batch_size
         self._step += 1
 
-        word, seq_len_list = pad_to_longest(self._sents[_start:_start + _bsz])
+        word, seq_len = pad_to_longest(self._sents[_start:_start + _bsz])
         label, _ = pad_to_longest(self._label[_start:_start + _bsz])
+        seq_len, perm_idx = seq_len.sort(0, descending=True)
+        word = word[perm_idx]
+        label = label[perm_idx]
+        _, unsort_idx = perm_idx.sort(0, descending=False)
 
-        return word, label, seq_len_list
+        return word, label, seq_len, unsort_idx

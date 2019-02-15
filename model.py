@@ -137,17 +137,18 @@ class BiLSTM(nn.Module):
     def _init_weights(self, scope=1.):
         self.word_ebd.weight.data.uniform_(-scope, scope)
 
-    def forward(self, words, hidden=None):
+    def forward(self, words, seq_lengths):
         encode = self.word_ebd(words)
-        output, hidden = self.lstm(encode, hidden)
+        packed_encode = torch.nn.utils.rnn.pack_padded_sequence(encode, seq_lengths, batch_first=True)
+        packed_output, hidden = self.lstm(packed_encode)
+        output, _ = torch.nn.utils.rnn.pad_packed_sequence(packed_output, batch_first=True)
+        
         return output, hidden
 
     def init_hidden(self):
-    #     weight = next(self.parameters()).data
-    #     return (weight.new(self.lstm_layers * 2, self.batch_size, self.lstm_hsz // 2).zero_(),
-    #             weight.new(self.lstm_layers * 2, self.batch_size, self.lstm_hsz // 2).zero_())
-        return (torch.randn(self.lstm_layers * 2, self.batch_size, self.lstm_hsz // 2),
-                    torch.randn(self.lstm_layers * 2, self.batch_size, self.lstm_hsz // 2))
+         weight = next(self.parameters()).data
+         return (weight.new(self.lstm_layers * 2, self.batch_size, self.lstm_hsz // 2).zero_(),
+                 weight.new(self.lstm_layers * 2, self.batch_size, self.lstm_hsz // 2).zero_())
 
 
 
@@ -165,16 +166,16 @@ class Model(nn.Module):
         self.crf = CRF(self.label_size, self.use_cuda)
         self._init_weights()
 
-    def forward(self, words, labels, hidden=None):
+    def forward(self, words, labels, seq_lengths):
 
-        output, _ = self.bilstm(words, hidden)
+        output, _ = self.bilstm(words, seq_lengths)
         output = self.logistic(output)
         pre_score = self.crf(output)
         label_score = self.crf._score_sentence(output, labels)
         return (pre_score - label_score).mean(), None
 
-    def predict(self, word):
-        lstm_out, _ = self.bilstm(word)
+    def predict(self, word, seq_lengths):
+        lstm_out, _ = self.bilstm(word, seq_lengths)
         out = self.logistic(lstm_out)
         return self.crf.viterbi_decode(out)
 
